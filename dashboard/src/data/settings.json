@@ -1,0 +1,8 @@
+{
+    "gunnyBagWeight": 0.7,
+    "plasticBagWeight": 0.3,
+    "millRate": 2369,
+    "qualityRate": 1900,
+    "recoveryRate": 0.68,
+    "lotSize": 290
+}

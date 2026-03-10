@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import './records.css';
 
 export default function RecordsPage() {
@@ -18,6 +17,11 @@ export default function RecordsPage() {
     const [moistureRowCount, setMoistureRowCount] = useState(1);
     // Track quality cut mode per row: 'percent' or 'kgpkt'
     const [qualityCutModes, setQualityCutModes] = useState<string[]>(['percent']);
+    // Search filters
+    const [searchFarmer, setSearchFarmer] = useState('');
+    const [searchVehicle, setSearchVehicle] = useState('');
+    // App settings (bag weights)
+    const [appSettings, setAppSettings] = useState({ gunnyBagWeight: 0.7, plasticBagWeight: 0.3 });
 
     const fetchRecords = async () => {
         try {
@@ -34,6 +38,10 @@ export default function RecordsPage() {
 
     useEffect(() => {
         fetchRecords();
+        // Fetch settings for packet weight formula
+        fetch('/api/settings').then(r => r.json()).then(s => {
+            setAppSettings({ gunnyBagWeight: s.gunnyBagWeight ?? 0.7, plasticBagWeight: s.plasticBagWeight ?? 0.3 });
+        }).catch(() => { });
     }, []);
 
     const handleOpenAdd = () => {
@@ -203,7 +211,7 @@ export default function RecordsPage() {
         const netKg = gross - tare;
         newData['NET (KG)'] = netKg;
 
-        const packetKgCalc = Math.round((gunnyCal * 0.7) + (plasticPacket * 0.3));
+        const packetKgCalc = Math.round((gunnyCal * appSettings.gunnyBagWeight) + (plasticPacket * appSettings.plasticBagWeight));
         newData['Packet (KG) calculated'] = packetKgCalc;
 
         const weightPerPacketIfAny = totalPacket > 0 ? (gross - tare - packetKgCalc) / totalPacket : 0;
@@ -317,18 +325,22 @@ export default function RecordsPage() {
         return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
     };
 
-    // Summary Calc
-    const totalMillQty = records.reduce((s, r) => s + (Number(r['Mill Qty. (qunital)']) || 0), 0);
-    const totalTp = records.reduce((s, r) => s + (Number(r['TP ACCEPTED']) || 0), 0);
+    // Filter records based on search
+    const filteredRecords = records.filter(r => {
+        const farmerMatch = !searchFarmer || (r['Farmer Name'] || '').toLowerCase().includes(searchFarmer.toLowerCase());
+        const vehicleMatch = !searchVehicle || (r['Vehicle No'] || '').toLowerCase().includes(searchVehicle.toLowerCase());
+        return farmerMatch && vehicleMatch;
+    });
+
+    // Summary Calc (uses filtered records)
+    const totalMillQty = filteredRecords.reduce((s, r) => s + (Number(r['Mill Qty. (qunital)']) || 0), 0);
+    const totalTp = filteredRecords.reduce((s, r) => s + (Number(r['TP ACCEPTED']) || 0), 0);
 
     return (
         <div className="records-container animate-in">
             {/* Header */}
             <header className="records-header">
                 <div className="header-left">
-                    <Link href="/" className="back-btn" title="Back to Dashboard">
-                        ←
-                    </Link>
                     <div className="header-title-group">
                         <h1>Lot Records Management</h1>
                         <p>Manage all incoming paddy receipts and quality deductions</p>
@@ -341,11 +353,37 @@ export default function RecordsPage() {
                 </div>
             </header>
 
+            {/* Search Filters */}
+            <div className="search-bar delay-1 animate-in">
+                <div className="search-field">
+                    <span className="search-icon">🔍</span>
+                    <input
+                        type="text"
+                        placeholder="Search by Farmer Name..."
+                        className="search-input"
+                        value={searchFarmer}
+                        onChange={e => setSearchFarmer(e.target.value)}
+                    />
+                    {searchFarmer && <button className="search-clear" onClick={() => setSearchFarmer('')}>×</button>}
+                </div>
+                <div className="search-field">
+                    <span className="search-icon">🚗</span>
+                    <input
+                        type="text"
+                        placeholder="Search by Vehicle No..."
+                        className="search-input"
+                        value={searchVehicle}
+                        onChange={e => setSearchVehicle(e.target.value)}
+                    />
+                    {searchVehicle && <button className="search-clear" onClick={() => setSearchVehicle('')}>×</button>}
+                </div>
+            </div>
+
             {/* Summary */}
             <div className="records-summary delay-1 animate-in">
                 <div className="summary-item">
                     <span className="summary-label">Total Records</span>
-                    <span className="summary-value highlight">{records.length}</span>
+                    <span className="summary-value highlight">{filteredRecords.length}</span>
                 </div>
                 <div className="summary-item">
                     <span className="summary-label">Total Mill Qty</span>
@@ -379,12 +417,14 @@ export default function RecordsPage() {
                                 <tr>
                                     <td colSpan={9} style={{ textAlign: 'center', padding: '40px 0' }}>Loading records...</td>
                                 </tr>
-                            ) : records.length === 0 ? (
+                            ) : filteredRecords.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} style={{ textAlign: 'center', padding: '40px 0' }}>No records found. Click "Add New Lot" to create one.</td>
+                                    <td colSpan={9} style={{ textAlign: 'center', padding: '40px 0' }}>
+                                        {records.length === 0 ? 'No records found. Click "Add New Lot" to create one.' : 'No records match your search.'}
+                                    </td>
                                 </tr>
                             ) : (
-                                records.map((rec) => (
+                                filteredRecords.map((rec) => (
                                     <tr key={rec['Sl No']}>
                                         <td>{rec['Sl No']}</td>
                                         <td>{formatDate(rec['Date'])}</td>

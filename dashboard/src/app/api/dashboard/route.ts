@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import databaseRecords from '@/data/database.json';
+import fs from 'fs';
+import path from 'path';
 
 interface Record {
     [key: string]: number | string | null | undefined;
@@ -18,8 +20,19 @@ function sumColumn(records: Record[], key: string): number {
     }, 0);
 }
 
+function readSettings() {
+    const DEFAULTS = { millRate: 2369, qualityRate: 1900, recoveryRate: 0.68, lotSize: 290 };
+    try {
+        const raw = fs.readFileSync(path.join(process.cwd(), 'src/data/settings.json'), 'utf-8');
+        return { ...DEFAULTS, ...JSON.parse(raw) };
+    } catch {
+        return DEFAULTS;
+    }
+}
+
 export async function GET() {
     const records = databaseRecords as Record[];
+    const settings = readSettings();
 
     // Replicate all 12 dashboard formulas
     const millQty = sumColumn(records, 'Mill Qty. (qunital)');
@@ -34,11 +47,11 @@ export async function GET() {
     const totalPacket = sumColumn(records, 'Total Packet');
     const tpAccepted = sumColumn(records, 'TP ACCEPTED');
 
-    // Rates
-    const millRate = 2369;
-    const qualityRate = 1900;
-    const recoveryRate = 0.68;
-    const bagWeight = 290;
+    // Rates from settings
+    const millRate = settings.millRate;
+    const qualityRate = settings.qualityRate;
+    const recoveryRate = settings.recoveryRate;
+    const lotSize = settings.lotSize;
 
     // Percentage = (totalQualityCutting / (millQty + totalQualityCutting)) * 100
     const percentage = (totalQualityCutting / (millQty + totalQualityCutting)) * 100;
@@ -55,10 +68,10 @@ export async function GET() {
     const qualityRecovery = totalQualityCutting * recoveryRate;
     const tpRecovery = tpAccepted * recoveryRate;
 
-    // Bags
-    const millBags = millRecovery / bagWeight;
-    const qualityBags = qualityRecovery / bagWeight;
-    const tpBags = tpRecovery / bagWeight;
+    // Lots
+    const millLots = millRecovery / lotSize;
+    const qualityLots = qualityRecovery / lotSize;
+    const tpLots = tpRecovery / lotSize;
 
     // Recent records for table (sanitize data)
     const recentRecords = records.map(r => ({
@@ -108,11 +121,11 @@ export async function GET() {
             millRecovery: Math.round(millRecovery * 100) / 100,
             qualityRecovery: Math.round(qualityRecovery * 100) / 100,
             tpRecovery: Math.round(tpRecovery * 100) / 100,
-            millBags: Math.round(millBags * 100) / 100,
-            qualityBags: Math.round(qualityBags * 100) / 100,
-            tpBags: Math.round(tpBags * 100) / 100,
+            millLots: Math.round(millLots * 100) / 100,
+            qualityLots: Math.round(qualityLots * 100) / 100,
+            tpLots: Math.round(tpLots * 100) / 100,
             recoveryRate,
-            bagWeight,
+            lotSize,
         },
         records: recentRecords,
         totalRecords: records.length,
