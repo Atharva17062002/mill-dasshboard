@@ -30,11 +30,11 @@ interface DashboardData {
     millRecovery: number;
     qualityRecovery: number;
     tpRecovery: number;
-    millBags: number;
-    qualityBags: number;
-    tpBags: number;
+    millLots: number;
+    qualityLots: number;
+    tpLots: number;
     recoveryRate: number;
-    bagWeight: number;
+    lotSize: number;
   };
   records: {
     slNo: number;
@@ -370,7 +370,7 @@ export default function Dashboard() {
                     <th>Rate (₹/q)</th>
                     <th>Revenue (₹)</th>
                     <th>68% Recovery (q)</th>
-                    <th>Bags (290kg)</th>
+                    <th>Lots ({r.lotSize}q)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -380,7 +380,7 @@ export default function Dashboard() {
                     <td className="revenue-subvalue">{formatCurrency(r.millRate)}</td>
                     <td className="revenue-highlight">{formatCurrency(r.millRevenue)}</td>
                     <td className="revenue-subvalue">{formatNum(r.millRecovery)}</td>
-                    <td className="revenue-subvalue">{formatNum(r.millBags)}</td>
+                    <td className="revenue-subvalue">{formatNum(r.millLots)}</td>
                   </tr>
                   <tr>
                     <td className="revenue-label">Quality + Moisture</td>
@@ -388,7 +388,7 @@ export default function Dashboard() {
                     <td className="revenue-subvalue">{formatCurrency(r.qualityRate)}</td>
                     <td className="revenue-highlight">{formatCurrency(r.qualityDeductionRevenue)}</td>
                     <td className="revenue-subvalue">{formatNum(r.qualityRecovery)}</td>
-                    <td className="revenue-subvalue">{formatNum(r.qualityBags)}</td>
+                    <td className="revenue-subvalue">{formatNum(r.qualityLots)}</td>
                   </tr>
                   <tr>
                     <td className="revenue-label">TP Accepted (SBP)</td>
@@ -396,7 +396,7 @@ export default function Dashboard() {
                     <td className="revenue-subvalue">{formatCurrency(r.qualityRate)}</td>
                     <td className="revenue-highlight">{formatCurrency(r.tpRevenue)}</td>
                     <td className="revenue-subvalue">{formatNum(r.tpRecovery)}</td>
-                    <td className="revenue-subvalue">{formatNum(r.tpBags)}</td>
+                    <td className="revenue-subvalue">{formatNum(r.tpLots)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -500,8 +500,8 @@ export default function Dashboard() {
                   <div className="stat-pill-value">{(r.recoveryRate * 100)}%</div>
                 </div>
                 <div className="stat-pill">
-                  <div className="stat-pill-label">Bag Weight</div>
-                  <div className="stat-pill-value">{r.bagWeight} kg</div>
+                  <div className="stat-pill-label">Lot Size</div>
+                  <div className="stat-pill-value">{r.lotSize} q</div>
                 </div>
               </div>
             </div>
