@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const SETTINGS_PATH = path.join(process.cwd(), 'src/data/settings.json');
+import { prisma } from '@/lib/prisma';
 
 const DEFAULTS = {
     gunnyBagWeight: 0.7,
@@ -13,27 +10,45 @@ const DEFAULTS = {
     lotSize: 290,
 };
 
-function readSettings() {
-    try {
-        const raw = fs.readFileSync(SETTINGS_PATH, 'utf-8');
-        return { ...DEFAULTS, ...JSON.parse(raw) };
-    } catch {
-        return { ...DEFAULTS };
-    }
-}
-
 export async function GET() {
-    return NextResponse.json(readSettings());
+    try {
+        const settings = await prisma.settings.findFirst();
+        return NextResponse.json(settings ? { ...DEFAULTS, ...settings } : DEFAULTS);
+    } catch (error) {
+        console.error('Error fetching settings:', error);
+        return NextResponse.json(DEFAULTS);
+    }
 }
 
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const current = readSettings();
-        const updated = { ...current, ...body };
-        fs.writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2) + '\n');
+
+        // Upsert the settings row (assuming singleton with id = 1)
+        const updated = await prisma.settings.upsert({
+            where: { id: 1 },
+            update: {
+                gunnyBagWeight: body.gunnyBagWeight,
+                plasticBagWeight: body.plasticBagWeight,
+                millRate: body.millRate,
+                qualityRate: body.qualityRate,
+                recoveryRate: body.recoveryRate,
+                lotSize: body.lotSize,
+            },
+            create: {
+                id: 1,
+                gunnyBagWeight: body.gunnyBagWeight ?? DEFAULTS.gunnyBagWeight,
+                plasticBagWeight: body.plasticBagWeight ?? DEFAULTS.plasticBagWeight,
+                millRate: body.millRate ?? DEFAULTS.millRate,
+                qualityRate: body.qualityRate ?? DEFAULTS.qualityRate,
+                recoveryRate: body.recoveryRate ?? DEFAULTS.recoveryRate,
+                lotSize: body.lotSize ?? DEFAULTS.lotSize,
+            }
+        });
+
         return NextResponse.json(updated);
-    } catch (err) {
+    } catch (error) {
+        console.error('Failed to save settings:', error);
         return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 });
     }
 }
