@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
+import { AuthProvider } from "@/contexts/AuthContext";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "Rice Mill Dashboard | Operations Tracker",
@@ -13,12 +14,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <Sidebar />
-        <main className="app-main">
-          {children}
-        </main>
+        <AuthProvider>
+          <AppShell>
+            {children}
+          </AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getAuthenticatedUser } from '@/lib/auth';
+import { canPerformAction, canEditField } from '@/lib/permissions';
 
 export async function getAllMappedLots() {
     const lots = await prisma.lot.findMany({
@@ -66,6 +68,9 @@ export async function getAllMappedLots() {
 // GET: Fetch all records mapped to legacy JSON format
 export async function GET() {
     try {
+        const user = await getAuthenticatedUser();
+        if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
         const mapped = await getAllMappedLots();
         return NextResponse.json(mapped);
     } catch (error) {
@@ -125,6 +130,12 @@ async function extractRelationsAndCuts(record: any) {
 // POST: Add a new record
 export async function POST(request: Request) {
     try {
+        const user = await getAuthenticatedUser();
+        if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        if (!canPerformAction(user, 'records', 'create')) {
+            return NextResponse.json({ error: 'Forbidden: no create permission' }, { status: 403 });
+        }
+
         const newRecord = await request.json();
 
         const season = await prisma.season.findFirst({ where: { isActive: true } });
@@ -162,13 +173,66 @@ export async function POST(request: Request) {
 // PUT: Update an existing record
 export async function PUT(request: Request) {
     try {
+        const user = await getAuthenticatedUser();
+        if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        if (!canPerformAction(user, 'records', 'edit')) {
+            return NextResponse.json({ error: 'Forbidden: no edit permission' }, { status: 403 });
+        }
+
         const updatedRecord = await request.json();
         const slNo = updatedRecord['Sl No'];
 
-        const existingLot = await prisma.lot.findUnique({ where: { slNo } });
+        const existingLot = await prisma.lot.findUnique({
+            where: { slNo },
+            include: { farmer: true, society: true }
+        });
         if (!existingLot) return NextResponse.json({ error: 'Record not found' }, { status: 404 });
 
-        const { farmerId, societyId, qualityCuts, moistureCuts } = await extractRelationsAndCuts(updatedRecord);
+        // For staff users, merge only permitted fields with existing values
+        let mergedRecord = updatedRecord;
+        if (user.role === 'staff') {
+            const fieldMap: Record<string, string> = {
+                'Date': 'Date',
+                'Farmer Name': 'Farmer Name',
+                'Society': 'Society',
+                'Vehicle No': 'Vehicle No',
+                'TP ACCEPTED': 'TP ACCEPTED',
+                'Token Qty ( Quintal )': 'Token Qty ( Quintal )',
+                'Gross(KG)': 'Gross(KG)',
+                'Tare(KG)': 'Tare(KG)',
+                'Total Packet': 'Total Packet',
+                'Plastic Packet': 'Plastic Packet',
+            };
+
+            // Get current mapped record to compare
+            const currentMapped = (await getAllMappedLots()).find((r: any) => r['Sl No'] === slNo);
+            if (currentMapped) {
+                mergedRecord = { ...currentMapped, ...mergedRecord };
+                // Revert fields the staff cannot edit
+                for (const [fieldName, recordKey] of Object.entries(fieldMap)) {
+                    if (!canEditField(user, 'records', fieldName)) {
+                        mergedRecord[recordKey] = currentMapped[recordKey];
+                    }
+                }
+                // Quality/Moisture cuts override check
+                if (!canEditField(user, 'records', 'Quality Cuts')) {
+                    // Keep existing quality cuts by not modifying quality_count/pct/kgpkt fields
+                    for (let i = 1; i <= 20; i++) {
+                        if (currentMapped[`quality_count_${i}`] !== undefined) mergedRecord[`quality_count_${i}`] = currentMapped[`quality_count_${i}`];
+                        if (currentMapped[`quality_pct_${i}`] !== undefined) mergedRecord[`quality_pct_${i}`] = currentMapped[`quality_pct_${i}`];
+                        if (currentMapped[`quality_kgpkt_${i}`] !== undefined) mergedRecord[`quality_kgpkt_${i}`] = currentMapped[`quality_kgpkt_${i}`];
+                    }
+                }
+                if (!canEditField(user, 'records', 'Moisture Cuts')) {
+                    for (let i = 1; i <= 20; i++) {
+                        if (currentMapped[`moisture_count_${i}`] !== undefined) mergedRecord[`moisture_count_${i}`] = currentMapped[`moisture_count_${i}`];
+                        if (currentMapped[`moisture_pct_${i}`] !== undefined) mergedRecord[`moisture_pct_${i}`] = currentMapped[`moisture_pct_${i}`];
+                    }
+                }
+            }
+        }
+
+        const { farmerId, societyId, qualityCuts, moistureCuts } = await extractRelationsAndCuts(mergedRecord);
 
         // Delete old cuts
         await prisma.qualityCut.deleteMany({ where: { lotId: existingLot.id } });
@@ -178,22 +242,22 @@ export async function PUT(request: Request) {
         await prisma.lot.update({
             where: { id: existingLot.id },
             data: {
-                entryDate: new Date(updatedRecord['Date'] || new Date()),
+                entryDate: new Date(mergedRecord['Date'] || new Date()),
                 farmerId,
                 societyId,
-                vehicleNo: safeString(updatedRecord['Vehicle No']) || 'UNKNOWN',
-                tpAccepted: safeNum(updatedRecord['TP ACCEPTED']),
-                tokenQtyQuintal: safeNum(updatedRecord['Token Qty ( Quintal )']),
-                totalPacket: safeNum(updatedRecord['Total Packet']),
-                plasticPacket: safeNum(updatedRecord['Plastic Packet']),
-                grossKg: safeNum(updatedRecord['Gross(KG)']),
-                tareKg: safeNum(updatedRecord['Tare(KG)']),
+                vehicleNo: safeString(mergedRecord['Vehicle No']) || 'UNKNOWN',
+                tpAccepted: safeNum(mergedRecord['TP ACCEPTED']),
+                tokenQtyQuintal: safeNum(mergedRecord['Token Qty ( Quintal )']),
+                totalPacket: safeNum(mergedRecord['Total Packet']),
+                plasticPacket: safeNum(mergedRecord['Plastic Packet']),
+                grossKg: safeNum(mergedRecord['Gross(KG)']),
+                tareKg: safeNum(mergedRecord['Tare(KG)']),
                 qualityCuts: { create: qualityCuts },
                 moistureCuts: { create: moistureCuts }
             }
         });
 
-        return NextResponse.json({ success: true, record: updatedRecord });
+        return NextResponse.json({ success: true, record: mergedRecord });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: 'Failed to update record' }, { status: 500 });
@@ -203,6 +267,12 @@ export async function PUT(request: Request) {
 // DELETE: Remove a record
 export async function DELETE(request: Request) {
     try {
+        const user = await getAuthenticatedUser();
+        if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        if (!canPerformAction(user, 'records', 'delete')) {
+            return NextResponse.json({ error: 'Forbidden: no delete permission' }, { status: 403 });
+        }
+
         const { searchParams } = new URL(request.url);
         const slNoParam = searchParams.get('id');
 

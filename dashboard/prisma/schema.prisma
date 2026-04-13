@@ -9,17 +9,49 @@ datasource db {
 // ─── Auth & RBAC ────────────────────────────────────────────
 
 model User {
-  id        String   @id @default(cuid())
+  id        String   @id // Supabase Auth user UUID
   name      String
   email     String   @unique
   mill      String?
-  role      String   @default("worker") // 'admin' | 'worker'
+  role      String   @default("staff") // 'service_provider' | 'admin' | 'staff'
+  createdBy String?  @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
 
+  screenPermissions   ScreenPermission[]
+  fieldPermissions    FieldPermission[]
   adjustmentsCreated  Adjustment[] @relation("AdjustmentCreatedBy")
   adjustmentsApproved Adjustment[] @relation("AdjustmentApprovedBy")
 
   @@map("users")
+}
+
+model ScreenPermission {
+  id        Int     @id @default(autoincrement())
+  userId    String  @map("user_id")
+  screen    String  // 'dashboard' | 'records' | 'settings' | 'users'
+  canAccess Boolean @default(false) @map("can_access")
+  canCreate Boolean @default(false) @map("can_create")
+  canEdit   Boolean @default(false) @map("can_edit")
+  canDelete Boolean @default(false) @map("can_delete")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, screen])
+  @@map("screen_permissions")
+}
+
+model FieldPermission {
+  id        Int     @id @default(autoincrement())
+  userId    String  @map("user_id")
+  screen    String  // e.g. 'records'
+  fieldName String  @map("field_name")
+  canView   Boolean @default(true) @map("can_view")
+  canEdit   Boolean @default(false) @map("can_edit")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, screen, fieldName])
+  @@map("field_permissions")
 }
 
 // ─── App Configuration ──────────────────────────────────────

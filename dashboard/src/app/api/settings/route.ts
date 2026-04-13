@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getAuthenticatedUser } from '@/lib/auth';
 
 const DEFAULTS = {
     gunnyBagWeight: 0.7,
@@ -12,6 +13,9 @@ const DEFAULTS = {
 
 export async function GET() {
     try {
+        const user = await getAuthenticatedUser();
+        if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
         const settings = await prisma.settings.findFirst();
         return NextResponse.json(settings ? { ...DEFAULTS, ...settings } : DEFAULTS);
     } catch (error) {
@@ -22,6 +26,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
     try {
+        const user = await getAuthenticatedUser();
+        if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        if (user.role !== 'service_provider' && user.role !== 'admin') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
         const body = await request.json();
 
         // Upsert the settings row (assuming singleton with id = 1)

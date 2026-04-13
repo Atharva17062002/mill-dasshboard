@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import './records.css';
 
 export default function RecordsPage() {
@@ -22,6 +23,15 @@ export default function RecordsPage() {
     const [searchVehicle, setSearchVehicle] = useState('');
     // App settings (bag weights)
     const [appSettings, setAppSettings] = useState({ gunnyBagWeight: 0.7, plasticBagWeight: 0.3 });
+
+    // Auth
+    const { canPerform, canEditField: canEditFieldAuth } = useAuth();
+    const canCreate = canPerform('records', 'create');
+    const canEdit = canPerform('records', 'edit');
+    const canDelete = canPerform('records', 'delete');
+
+    // Helper: check if a field is editable (for the form)
+    const isFieldEditable = (fieldName: string) => canEditFieldAuth('records', fieldName);
 
     const fetchRecords = async () => {
         try {
@@ -347,9 +357,11 @@ export default function RecordsPage() {
                     </div>
                 </div>
                 <div className="action-buttons">
-                    <button className="btn-primary" onClick={handleOpenAdd}>
-                        + Add New Lot
-                    </button>
+                    {canCreate && (
+                        <button className="btn-primary" onClick={handleOpenAdd}>
+                            + Add New Lot
+                        </button>
+                    )}
                 </div>
             </header>
 
@@ -440,12 +452,16 @@ export default function RecordsPage() {
                                         </td>
                                         <td className="text-right">
                                             <div className="action-buttons">
-                                                <button className="btn-icon-edit" onClick={() => handleOpenEdit(rec)} title="Edit Record">
-                                                    ✎ Edit
-                                                </button>
-                                                <button className="btn-icon-delete" onClick={() => handleOpenDelete(rec)} title="Delete Record">
-                                                    × Delete
-                                                </button>
+                                                {canEdit && (
+                                                    <button className="btn-icon-edit" onClick={() => handleOpenEdit(rec)} title="Edit Record">
+                                                        ✎ Edit
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button className="btn-icon-delete" onClick={() => handleOpenDelete(rec)} title="Delete Record">
+                                                        × Delete
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -504,27 +520,27 @@ export default function RecordsPage() {
                                 <div className="form-grid">
                                     <div className="form-group">
                                         <label>Date</label>
-                                        <input type="date" name="Date" className="form-control" required value={formData['Date'] || ''} onChange={handleInputChange} />
+                                        <input type="date" name="Date" className="form-control" required value={formData['Date'] || ''} onChange={handleInputChange} disabled={!isFieldEditable('Date')} />
                                     </div>
                                     <div className="form-group">
                                         <label>Farmer Name</label>
-                                        <input type="text" name="Farmer Name" className="form-control" value={formData['Farmer Name'] || ''} onChange={handleInputChange} />
+                                        <input type="text" name="Farmer Name" className="form-control" value={formData['Farmer Name'] || ''} onChange={handleInputChange} disabled={!isFieldEditable('Farmer Name')} />
                                     </div>
                                     <div className="form-group">
                                         <label>Society</label>
-                                        <input type="text" name="Society" className="form-control" value={formData['Society'] || ''} onChange={handleInputChange} />
+                                        <input type="text" name="Society" className="form-control" value={formData['Society'] || ''} onChange={handleInputChange} disabled={!isFieldEditable('Society')} />
                                     </div>
                                     <div className="form-group">
                                         <label>Vehicle No</label>
-                                        <input type="text" name="Vehicle No" style={{ textTransform: "uppercase" }} className="form-control" value={formData['Vehicle No'] || ''} onChange={handleInputChange} />
+                                        <input type="text" name="Vehicle No" style={{ textTransform: "uppercase" }} className="form-control" value={formData['Vehicle No'] || ''} onChange={handleInputChange} disabled={!isFieldEditable('Vehicle No')} />
                                     </div>
                                     <div className="form-group">
                                         <label>TP Accepted (q)</label>
-                                        <input type="number" step="0.01" name="TP ACCEPTED" className="form-control" value={formData['TP ACCEPTED'] ?? ''} onChange={handleInputChange} />
+                                        <input type="number" step="0.01" name="TP ACCEPTED" className="form-control" value={formData['TP ACCEPTED'] ?? ''} onChange={handleInputChange} disabled={!isFieldEditable('TP ACCEPTED')} />
                                     </div>
                                     <div className="form-group">
                                         <label>Token Qty (q)</label>
-                                        <input type="number" step="0.01" name="Token Qty ( Quintal )" className="form-control" value={formData['Token Qty ( Quintal )'] ?? ''} onChange={handleInputChange} />
+                                        <input type="number" step="0.01" name="Token Qty ( Quintal )" className="form-control" value={formData['Token Qty ( Quintal )'] ?? ''} onChange={handleInputChange} disabled={!isFieldEditable('Token Qty ( Quintal )')} />
                                     </div>
                                 </div>
 
@@ -533,19 +549,19 @@ export default function RecordsPage() {
                                 <div className="form-grid">
                                     <div className="form-group">
                                         <label>Gross Weight (kg)</label>
-                                        <input type="number" name="Gross(KG)" className="form-control" required value={formData['Gross(KG)'] ?? ''} onChange={handleInputChange} />
+                                        <input type="number" name="Gross(KG)" className="form-control" required value={formData['Gross(KG)'] ?? ''} onChange={handleInputChange} disabled={!isFieldEditable('Gross(KG)')} />
                                     </div>
                                     <div className="form-group">
                                         <label>Tare Weight (kg)</label>
-                                        <input type="number" name="Tare(KG)" className="form-control" value={formData['Tare(KG)'] ?? ''} onChange={handleInputChange} />
+                                        <input type="number" name="Tare(KG)" className="form-control" value={formData['Tare(KG)'] ?? ''} onChange={handleInputChange} disabled={!isFieldEditable('Tare(KG)')} />
                                     </div>
                                     <div className="form-group">
                                         <label>Total Packets</label>
-                                        <input type="number" name="Total Packet" className="form-control" required value={formData['Total Packet'] ?? ''} onChange={handleInputChange} />
+                                        <input type="number" name="Total Packet" className="form-control" required value={formData['Total Packet'] ?? ''} onChange={handleInputChange} disabled={!isFieldEditable('Total Packet')} />
                                     </div>
                                     <div className="form-group">
                                         <label>Plastic Packets</label>
-                                        <input type="number" name="Plastic Packet" className="form-control" required value={formData['Plastic Packet'] ?? ''} onChange={handleInputChange} />
+                                        <input type="number" name="Plastic Packet" className="form-control" required value={formData['Plastic Packet'] ?? ''} onChange={handleInputChange} disabled={!isFieldEditable('Plastic Packet')} />
                                     </div>
                                 </div>
 
