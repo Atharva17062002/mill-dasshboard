@@ -47,13 +47,18 @@ const RECORD_FIELDS = [
 ];
 
 async function main() {
-    const EMAIL = 'sp@ricemill.com';
-    const PASSWORD = 'Admin@123';
+    const EMAIL = process.env.INITIAL_ADMIN_EMAIL;
+    const PASSWORD = process.env.INITIAL_ADMIN_PASSWORD;
     const NAME = 'Service Provider';
+
+    if (!EMAIL || !PASSWORD) {
+        console.error('Missing INITIAL_ADMIN_EMAIL or INITIAL_ADMIN_PASSWORD in .env.local');
+        process.exit(1);
+    }
 
     console.log(`\n🌾 Creating Service Provider user...`);
     console.log(`   Email:    ${EMAIL}`);
-    console.log(`   Password: ${PASSWORD}\n`);
+    console.log(`   Password: [HIDDEN]\n`);
 
     // 1. Create Supabase Auth user
     const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
@@ -126,7 +131,7 @@ async function createPrismaUser(userId: string, name: string, email: string) {
     console.log(`✅ Database user created with full permissions.`);
     console.log(`\n🎉 Setup complete! You can now log in with:`);
     console.log(`   Email:    ${email}`);
-    console.log(`   Password: Admin@123\n`);
+    console.log(`   Password: [HIDDEN] (From environment file)\n`);
 }
 
 main()
