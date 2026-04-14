@@ -55,6 +55,7 @@ async function main() {
         where: { email: 'admin@ricemill.com' },
         update: {},
         create: {
+            id: 'legacy-seed-admin-id',
             name: 'System Admin',
             email: 'admin@ricemill.com',
             role: 'admin',

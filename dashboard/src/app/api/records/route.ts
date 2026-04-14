@@ -13,7 +13,7 @@ export async function getAllMappedLots() {
     const gunnyWt = settings?.gunnyBagWeight ?? 0.7;
     const plasticWt = settings?.plasticBagWeight ?? 0.3;
 
-    return lots.map(lot => {
+    return lots.map((lot: any) => {
         const res: any = {
             'Sl No': lot.slNo,
             'Date': lot.entryDate.toISOString(),
@@ -37,7 +37,7 @@ export async function getAllMappedLots() {
 
         const weightPerPacketIfAny = lot.totalPacket > 0 ? (lot.grossKg - lot.tareKg - packetKgCalc) / lot.totalPacket : 0;
 
-        lot.qualityCuts.forEach(qc => {
+        lot.qualityCuts.forEach((qc: any) => {
             res[`quality_count_${qc.rowIndex}`] = qc.packetCount;
             if (qc.mode === 'percent') {
                 res[`quality_pct_${qc.rowIndex}`] = qc.qualityPct;
@@ -48,7 +48,7 @@ export async function getAllMappedLots() {
             }
         });
 
-        lot.moistureCuts.forEach(mc => {
+        lot.moistureCuts.forEach((mc: any) => {
             res[`moisture_count_${mc.rowIndex}`] = mc.packetCount;
             res[`moisture_pct_${mc.rowIndex}`] = mc.moisturePct;
             totalMCutKg += Math.round((weightPerPacketIfAny * mc.packetCount) * (mc.moisturePct! / 100));
