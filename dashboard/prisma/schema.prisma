@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+// ─── Auth & RBAC ────────────────────────────────────────────
+
+model User {
+  id        String   @id // Supabase Auth user UUID
+  name      String
+  email     String   @unique
+  mill      String?
+  role      String   @default("staff") // 'service_provider' | 'admin' | 'staff'
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  screenPermissions   ScreenPermission[]
+  fieldPermissions    FieldPermission[]
+  adjustmentsCreated  Adjustment[] @relation("AdjustmentCreatedBy")
+  adjustmentsApproved Adjustment[] @relation("AdjustmentApprovedBy")
+
+  @@map("users")
+}
+
+model ScreenPermission {
+  id        Int     @id @default(autoincrement())
+  userId    String  @map("user_id")
+  screen    String  // 'dashboard' | 'records' | 'settings' | 'users'
+  canAccess Boolean @default(false) @map("can_access")
+  canCreate Boolean @default(false) @map("can_create")
+  canEdit   Boolean @default(false) @map("can_edit")
+  canDelete Boolean @default(false) @map("can_delete")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, screen])
+  @@map("screen_permissions")
+}
+
+model FieldPermission {
+  id        Int     @id @default(autoincrement())
+  userId    String  @map("user_id")
+  screen    String  // e.g. 'records'
+  fieldName String  @map("field_name")
+  canView   Boolean @default(true) @map("can_view")
+  canEdit   Boolean @default(false) @map("can_edit")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, screen, fieldName])
+  @@map("field_permissions")
+}
+
+// ─── App Configuration ──────────────────────────────────────
+
+model Settings {
+  id               Int      @id @default(autoincrement())
+  gunnyBagWeight   Float    @default(0.7)  @map("gunny_bag_weight")
+  plasticBagWeight Float    @default(0.3)  @map("plastic_bag_weight")
+  millRate         Float    @default(2369) @map("mill_rate")
+  qualityRate      Float    @default(1900) @map("quality_rate")
+  recoveryRate     Float    @default(0.68) @map("recovery_rate")
+  lotSize          Int      @default(290)  @map("lot_size")
+  updatedAt        DateTime @updatedAt     @map("updated_at")
+
+  @@map("settings")
+}
+
+// ─── Seasons (Rabi / Kharif) ────────────────────────────────
+
+model Season {
+  id        Int      @id @default(autoincrement())
+  name      String   // e.g. "Kharif 2025", "Rabi 2025-26"
+  type      String   // 'kharif' | 'rabi'
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+  isActive  Boolean  @default(false) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  lots Lot[]
+
+  @@map("seasons")
+}
+
+// ─── Societies ──────────────────────────────────────────────
+
+model Society {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique  // e.g. "REMED SCS LTD"
+  code      String?  // e.g. "S1280204"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  lots Lot[]
+
+  @@map("societies")
+}
+
+// ─── Farmers ────────────────────────────────────────────────
+// NOTE: No society FK here — farmer can change societies per lot visit
+
+model Farmer {
+  id         Int      @id @default(autoincrement())
+  name       String
+  tokenName  String?  @map("token_name")
+  farmerCode String?  @map("farmer_code")
+  ppcName    String?  @map("ppc_name")
+  mobile     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  lots Lot[]
+
+  @@map("farmers")
+}
+
+// ─── Lots (Core Record) ─────────────────────────────────────
+// Stores ONLY raw input values. Derived fields computed in app.
+
+model Lot {
+  id                     Int      @id @default(autoincrement())
+  slNo                   Int      @unique @map("sl_no")
+  seasonId               Int      @map("season_id")
+  entryDate              DateTime @map("entry_date")
+  farmerId               Int      @map("farmer_id")
+  societyId              Int      @map("society_id")
+  vehicleNo              String   @map("vehicle_no")
+  tpAccepted             Float    @map("tp_accepted")
+  tokenNo                String?  @map("token_no")
+  tokenQtyQuintal        Float    @map("token_qty_quintal")
+  totalPacket            Int      @map("total_packet")
+  plasticPacket          Int      @default(0) @map("plastic_packet")
+  grossKg                Float    @map("gross_kg")
+  tareKg                 Float    @map("tare_kg")
+  gunnyAdv               Int?     @map("gunny_adv")
+  rejGunny               Int?     @default(0) @map("rej_gunny")
+  qualityCuttingQuintal  Float?   @map("quality_cutting_quintal")
+  freightPaidDate        DateTime? @map("freight_paid_date")
+  freightPaid            Float?   @map("freight_paid")
+  comment                String?
+  settlementStatus       String   @default("pending") @map("settlement_status")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  season       Season       @relation(fields: [seasonId], references: [id])
+  farmer       Farmer       @relation(fields: [farmerId], references: [id])
+  society      Society      @relation(fields: [societyId], references: [id])
+  qualityCuts  QualityCut[]
+  moistureCuts MoistureCut[]
+  adjustments  Adjustment[] @relation("AdjustmentLot")
+  donorAdjustments Adjustment[] @relation("AdjustmentSourceLot")
+
+  @@map("lots")
+}
+
+// ─── Quality Cuts (Child — variable rows per lot) ───────────
+
+model QualityCut {
+  id          Int      @id @default(autoincrement())
+  lotId       Int      @map("lot_id")
+  rowIndex    Int      @map("row_index")
+  mode        String   @default("percent") // 'percent' | 'kgpkt'
+  packetCount Int      @map("packet_count")
+  qualityPct  Float?   @map("quality_pct")
+  kgPerPkt    Float?   @map("kg_per_pkt")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lot Lot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  @@map("quality_cuts")
+}
+
+// ─── Moisture Cuts (Child — variable rows per lot) ──────────
+
+model MoistureCut {
+  id          Int      @id @default(autoincrement())
+  lotId       Int      @map("lot_id")
+  rowIndex    Int      @map("row_index")
+  packetCount Int      @map("packet_count")
+  moisturePct Float    @map("moisture_pct")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lot Lot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  @@map("moisture_cuts")
+}
+
+// ─── Adjustments (Admin-only — secret ledger) ───────────────
+
+model Adjustment {
+  id           Int      @id @default(autoincrement())
+  lotId        Int      @map("lot_id")
+  type         String   // 'cash' | 'surplus_transfer'
+  qtyQuintal   Float    @map("qty_quintal")
+  ratePerQtl   Float?   @map("rate_per_qtl")
+  amountPaid   Float?   @map("amount_paid")
+  sourceLotId  Int?     @map("source_lot_id")
+  notes        String?
+  createdById  String   @map("created_by")
+  approvedById String?  @map("approved_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  lot       Lot    @relation("AdjustmentLot", fields: [lotId], references: [id])
+  sourceLot Lot?   @relation("AdjustmentSourceLot", fields: [sourceLotId], references: [id])
+  createdBy User   @relation("AdjustmentCreatedBy", fields: [createdById], references: [id])
+  approvedBy User? @relation("AdjustmentApprovedBy", fields: [approvedById], references: [id])
+
+  @@map("adjustments")
+}

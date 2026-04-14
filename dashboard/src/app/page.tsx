@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { QualityMoistureChart, PerLotBarChart, MillQtyChart } from '@/components/Charts';
 
 interface DashboardData {
@@ -136,6 +138,22 @@ export default function Dashboard() {
     } catch { /* ignore */ }
     setHydrated(true);
   }, []);
+
+  const { user: authUser, hasScreenAccess, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  // Redirect if user doesn't have permission for this screen
+  useEffect(() => {
+    if (!authLoading && authUser) {
+      if (!hasScreenAccess('dashboard')) {
+        // Find a screen they can access
+        if (hasScreenAccess('records')) router.push('/records');
+        else if (hasScreenAccess('settings')) router.push('/settings');
+        else if (hasScreenAccess('users')) router.push('/users');
+        else router.push('/login'); // Should not happen, but safe fallback
+      }
+    }
+  }, [authUser, authLoading, hasScreenAccess, router]);
 
   useEffect(() => {
     fetch('/api/dashboard')

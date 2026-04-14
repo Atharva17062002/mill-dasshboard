@@ -3,17 +3,31 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import './sidebar.css';
 
 const NAV_ITEMS = [
-    { href: '/', label: 'Dashboard', icon: '📊' },
-    { href: '/records', label: 'Records', icon: '📋' },
-    { href: '/settings', label: 'Settings', icon: '⚙️' },
+    { href: '/', label: 'Dashboard', icon: '📊', screen: 'dashboard' },
+    { href: '/records', label: 'Records', icon: '📋', screen: 'records' },
+    { href: '/settings', label: 'Settings', icon: '⚙️', screen: 'settings' },
+    { href: '/users', label: 'Users', icon: '👥', screen: 'users' },
 ];
 
 export default function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
+    const { user, logout, hasScreenAccess } = useAuth();
+
+    const getRoleLabel = (role: string) => {
+        switch (role) {
+            case 'service_provider': return 'Service Provider';
+            case 'admin': return 'Admin';
+            case 'staff': return 'Staff';
+            default: return role;
+        }
+    };
+
+    const visibleItems = NAV_ITEMS.filter(item => hasScreenAccess(item.screen));
 
     return (
         <>
@@ -24,7 +38,7 @@ export default function Sidebar() {
                 </div>
 
                 <nav className="sidebar-nav">
-                    {NAV_ITEMS.map(item => {
+                    {visibleItems.map(item => {
                         const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
                         return (
                             <Link
@@ -39,6 +53,25 @@ export default function Sidebar() {
                         );
                     })}
                 </nav>
+
+                {/* User Info & Logout */}
+                {user && (
+                    <div className="sidebar-user-section">
+                        {!collapsed && (
+                            <div className="sidebar-user-info">
+                                <div className="sidebar-user-name">{user.name}</div>
+                                <div className="sidebar-user-role">{getRoleLabel(user.role)}</div>
+                            </div>
+                        )}
+                        <button
+                            className="sidebar-logout-btn"
+                            onClick={logout}
+                            title="Sign out"
+                        >
+                            {collapsed ? '🚪' : '🚪 Sign Out'}
+                        </button>
+                    </div>
+                )}
 
                 <button
                     className="sidebar-toggle"

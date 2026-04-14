@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import databaseRecords from '@/data/database.json';
-import fs from 'fs';
-import path from 'path';
+import { prisma } from '@/lib/prisma';
+import { getAllMappedLots } from '@/app/api/records/route';
+import { getAuthenticatedUser } from '@/lib/auth';
 
 interface Record {
     [key: string]: number | string | null | undefined;
@@ -20,19 +20,22 @@ function sumColumn(records: Record[], key: string): number {
     }, 0);
 }
 
-function readSettings() {
+async function readSettings() {
     const DEFAULTS = { millRate: 2369, qualityRate: 1900, recoveryRate: 0.68, lotSize: 290 };
     try {
-        const raw = fs.readFileSync(path.join(process.cwd(), 'src/data/settings.json'), 'utf-8');
-        return { ...DEFAULTS, ...JSON.parse(raw) };
+        const settings = await prisma.settings.findFirst();
+        return settings ? { ...DEFAULTS, ...settings } : DEFAULTS;
     } catch {
         return DEFAULTS;
     }
 }
 
 export async function GET() {
-    const records = databaseRecords as Record[];
-    const settings = readSettings();
+    const user = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
+    const records = (await getAllMappedLots()) as Record[];
+    const settings = await readSettings();
 
     // Replicate all 12 dashboard formulas
     const millQty = sumColumn(records, 'Mill Qty. (qunital)');
